@@ -1,77 +1,129 @@
-# PostgreSQL Installation on Linux (PGDG Repository)
+# PostgreSQL Installation on Linux Using PGDG Repository
 
 ## Overview
 
-This guide explains how to install PostgreSQL on Linux using the official PostgreSQL Global Development Group (PGDG) repository. 
-This is the recommended method for production environments because it provides the latest stable releases and simplifies updates.
+This document describes the installation of PostgreSQL on Linux using the official PostgreSQL Global Development Group (PGDG) repository.
+
+The PGDG repository provides the latest stable PostgreSQL versions and is recommended for production environments.
+
+Supported operating systems:
+
+* Ubuntu / Debian
+* RHEL / Rocky Linux / AlmaLinux
 
 ---
 
-## Prerequisites
+# 1. Prerequisites
 
-* Ubuntu 22.04+ or Debian 12+
-* Sudo privileges
+Before installation, verify:
+
+* Linux server is available
+* Sudo or root access
 * Internet connection
-* At least 2 GB RAM
-* 10 GB free disk space
+* Minimum required disk space
+* Firewall configuration
+
+Check operating system:
+
+```bash
+cat /etc/os-release
+```
 
 ---
 
-## Step 1 – Update the System
+# 2. Installation on Ubuntu / Debian
+
+## Add PostgreSQL Repository
+
+Update system packages:
 
 ```bash
 sudo apt update
-sudo apt upgrade -y
+```
 
-
-## Step 2 – Add the PostgreSQL Repository
-
-Import the PostgreSQL signing key:
+Install required packages:
 
 ```bash
-curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | \
+sudo apt install -y wget ca-certificates gnupg
+```
+
+Import PostgreSQL signing key:
+
+```bash
+wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | \
 sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
 ```
 
-Add the PGDG repository:
+Add PGDG repository:
 
 ```bash
 echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] \
-https://apt.postgresql.org/pub/repos/apt \
-$(lsb_release -cs)-pgdg main" | \
+http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | \
 sudo tee /etc/apt/sources.list.d/pgdg.list
 ```
 
-Update package information:
+Update repository information:
 
 ```bash
 sudo apt update
 ```
 
+---
 
-## Step 3 – Install PostgreSQL
+## Install PostgreSQL
 
-Install PostgreSQL 16:
-
-```bash
-sudo apt install postgresql-16 postgresql-client-16 -y
-```
-
-Verify the installation:
+Example: PostgreSQL 16
 
 ```bash
-psql --version
+sudo apt install -y postgresql-16 postgresql-client-16
 ```
 
-## Step 4 – Check the Service
-
-Verify the PostgreSQL service:
+Install additional tools:
 
 ```bash
-sudo systemctl status postgresql
+sudo apt install -y postgresql-contrib-16
 ```
 
-Start the service if needed:
+---
+
+# 3. Installation on RHEL / Rocky Linux / AlmaLinux
+
+## Add PostgreSQL Repository
+
+Install PGDG repository package:
+
+```bash
+sudo dnf install -y \
+https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+```
+
+Disable default PostgreSQL module:
+
+```bash
+sudo dnf -qy module disable postgresql
+```
+
+---
+
+## Install PostgreSQL Server
+
+```bash
+sudo dnf install -y postgresql16-server postgresql16
+```
+
+---
+
+## Initialize Database Cluster
+
+```bash
+sudo /usr/pgsql-16/bin/postgresql-16-setup initdb
+```
+
+---
+
+# 4. Start PostgreSQL Service
+
+Ubuntu / Debian:
 
 ```bash
 sudo systemctl start postgresql
@@ -83,15 +135,35 @@ Enable automatic startup:
 sudo systemctl enable postgresql
 ```
 
-## Step 5 – Connect to PostgreSQL
+RHEL Based:
 
-Switch to the PostgreSQL administrator account:
+```bash
+sudo systemctl start postgresql-16
+```
+
+Enable service:
+
+```bash
+sudo systemctl enable postgresql-16
+```
+
+---
+
+# 5. Verify Installation
+
+Check PostgreSQL version:
+
+```bash
+psql --version
+```
+
+Connect to PostgreSQL:
 
 ```bash
 sudo -u postgres psql
 ```
 
-Verify the version:
+Check database version:
 
 ```sql
 SELECT version();
@@ -99,104 +171,148 @@ SELECT version();
 
 ---
 
-## Step 6 – Create a Database
+# 6. Initial Database Configuration
+
+## Create Database
 
 ```sql
-CREATE DATABASE companydb;
-```
-
-List all databases:
-
-```sql
-\l
+CREATE DATABASE testdb;
 ```
 
 ---
 
-## Step 7 – Create a User
+## Create User
 
 ```sql
-CREATE USER dbadmin
+CREATE USER app_user
 WITH PASSWORD 'StrongPassword123';
 ```
 
-Grant privileges:
+---
+
+## Grant Access
 
 ```sql
 GRANT ALL PRIVILEGES
-ON DATABASE companydb
-TO dbadmin;
+ON DATABASE testdb
+TO app_user;
 ```
 
 ---
 
-## Step 8 – Verify Configuration
+# 7. Service Management
 
-Display the configuration file:
+Check status:
 
-```sql
-SHOW config_file;
+```bash
+systemctl status postgresql
 ```
 
-Display the data directory:
+Restart service:
 
-```sql
-SHOW data_directory;
+```bash
+sudo systemctl restart postgresql
+```
+
+Reload configuration:
+
+```bash
+sudo systemctl reload postgresql
 ```
 
 ---
 
-## Step 9 – Health Check
+# 8. Verify Network Listener
 
-Show active sessions:
+Check PostgreSQL port:
+
+```bash
+ss -lntp | grep 5432
+```
+
+Default PostgreSQL port:
+
+```text
+5432
+```
+
+---
+
+# 9. Basic Health Check
+
+Active connections:
 
 ```sql
-SELECT datname, COUNT(*)
+SELECT
+    datname,
+    count(*)
 FROM pg_stat_activity
 GROUP BY datname;
 ```
 
-Show database sizes:
+Database size:
 
 ```sql
-SELECT datname,
-       pg_size_pretty(pg_database_size(datname)) AS size
+SELECT
+    datname,
+    pg_size_pretty(pg_database_size(datname))
 FROM pg_database;
 ```
 
 ---
 
-## Troubleshooting
+# 10. Best Practices
 
-| Issue                  | Solution                                   |
-| ---------------------- | ------------------------------------------ |
-| Service is not running | Check `systemctl status postgresql`        |
-| Authentication failed  | Verify user credentials and `pg_hba.conf`  |
-| Port conflict          | Check if port `5432` is already in use     |
-| Repository error       | Verify the PGDG repository and signing key |
-
----
-
-## Best Practices
-
-* Install PostgreSQL from the official PGDG repository.
-* Keep PostgreSQL updated with security patches.
-* Use strong passwords for all database users.
-* Configure regular backups immediately after installation.
-* Monitor PostgreSQL logs and service status.
+* Use PGDG repository for production installations.
+* Keep PostgreSQL packages updated.
+* Configure backups before application deployment.
+* Review authentication settings.
+* Monitor logs regularly.
+* Document installation parameters.
 
 ---
 
-## Images
+# Troubleshooting
 
-* `images/linux-update-system.png`
-* `images/add-pgdg-repository.png`
-* `images/install-postgresql.png`
-* `images/systemctl-status.png`
+## PostgreSQL Service Not Running
+
+Check:
+
+```bash
+systemctl status postgresql
+```
+
+View logs:
+
+```bash
+journalctl -u postgresql
+```
 
 ---
 
-## References
+## Connection Failed
 
-* PostgreSQL Official Documentation
-* PostgreSQL Wiki
+Check:
+
+```bash
+ss -lntp | grep 5432
+```
+
+Review:
+
+```text
+postgresql.conf
+pg_hba.conf
+```
+
+---
+
+# Next Steps
+
+Continue with:
+
+* PostgreSQL Configuration
+* Security Hardening
+* Backup and Recovery
+* Monitoring
+* Performance Tuning
