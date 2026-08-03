@@ -6,20 +6,20 @@ The `pg_hba.conf` file controls client authentication and access permissions in 
 
 HBA stands for:
 
-**Host-Based Authentication**
+Host-Based Authentication
 
 This file defines:
 
-* Which users can connect
-* Which databases they can access
-* From which IP addresses
-* Which authentication method is used
+- Which users can connect
+- Which databases they can access
+- From which IP addresses connections are allowed
+- Which authentication method is used
 
 ---
 
 # 1. Location of pg_hba.conf
 
-Find the file location:
+Find the active authentication file:
 
 ```sql
 SHOW hba_file;
@@ -49,7 +49,7 @@ C:\Program Files\PostgreSQL\<version>\data\pg_hba.conf
 
 # 2. File Structure
 
-Each rule contains five fields:
+Each authentication rule contains five fields:
 
 ```text
 TYPE   DATABASE   USER   ADDRESS   METHOD
@@ -58,18 +58,18 @@ TYPE   DATABASE   USER   ADDRESS   METHOD
 Example:
 
 ```conf
-host    all     all     192.168.1.0/24     scram-sha-256
+host    all    all    192.168.1.0/24    scram-sha-256
 ```
 
 Meaning:
 
-| Field    | Description           |
-| -------- | --------------------- |
-| TYPE     | Connection type       |
-| DATABASE | Allowed database      |
-| USER     | Allowed user          |
-| ADDRESS  | Client IP range       |
-| METHOD   | Authentication method |
+| Field | Description |
+|---|---|
+| TYPE | Connection type |
+| DATABASE | Allowed database |
+| USER | Allowed user |
+| ADDRESS | Client IP range |
+| METHOD | Authentication method |
 
 ---
 
@@ -90,7 +90,7 @@ local   all   all   peer
 Used for remote connections:
 
 ```conf
-host    all   all   0.0.0.0/0   scram-sha-256
+host    all    all    192.168.1.0/24    scram-sha-256
 ```
 
 ---
@@ -99,7 +99,7 @@ host    all   all   0.0.0.0/0   scram-sha-256
 
 ## trust
 
-No password required.
+No password is required.
 
 Example:
 
@@ -109,21 +109,23 @@ host all all 192.168.1.10/32 trust
 
 Use:
 
-* Temporary testing only
+- Temporary testing only
 
-Avoid in production.
+Avoid in production environments.
 
 ---
 
 ## password
 
-Password authentication.
+Uses clear-text password authentication.
+
+Example:
 
 ```conf
 host all all 192.168.1.10/32 password
 ```
 
-Password is sent without encryption.
+SSL encryption should be used when applying this method.
 
 ---
 
@@ -131,21 +133,27 @@ Password is sent without encryption.
 
 Password authentication using MD5 encryption.
 
+Example:
+
 ```conf
 host all all 192.168.1.10/32 md5
 ```
+
+Older authentication method.
 
 ---
 
 ## scram-sha-256
 
-Modern and recommended authentication method.
+Modern password authentication method.
+
+Example:
 
 ```conf
 host all all 192.168.1.10/32 scram-sha-256
 ```
 
-Recommended for production.
+Recommended for production environments.
 
 ---
 
@@ -155,7 +163,7 @@ Recommended for production.
 
 Edit:
 
-```conf
+```text
 postgresql.conf
 ```
 
@@ -169,15 +177,13 @@ listen_addresses = '*'
 
 ## Step 2: Add Client Access Rule
 
-Example:
-
-Allow server:
+Allow client server:
 
 ```text
 192.168.1.50
 ```
 
-to connect:
+Configuration:
 
 ```conf
 host    all    all    192.168.1.50/32    scram-sha-256
@@ -201,21 +207,20 @@ sudo systemctl reload postgresql
 
 # 6. Restrict Database Access
 
-Allow only specific user:
+Allow only a specific user:
 
 ```conf
-host
-salesdb
-sales_user
-192.168.1.0/24
-scram-sha-256
+host    salesdb    sales_user    192.168.1.0/24    scram-sha-256
 ```
 
 Meaning:
 
-* Database: salesdb
-* User: sales_user
-* Network: 192.168.1.x
+```text
+Database  → salesdb
+User      → sales_user
+Network   → 192.168.1.x
+Method    → scram-sha-256
+```
 
 ---
 
@@ -227,38 +232,67 @@ PostgreSQL uses the first matching rule.
 
 Example:
 
-```conf
-host all all 0.0.0.0/0 reject
+Incorrect order:
 
-host salesdb app_user 192.168.1.20/32 scram-sha-256
+```conf
+host    all    all    0.0.0.0/0    reject
+
+host    salesdb    app_user    192.168.1.20/32    scram-sha-256
 ```
 
-The second rule will never work because the first rule blocks everything.
+The second rule will never be reached.
 
 Correct order:
 
 ```conf
-host salesdb app_user 192.168.1.20/32 scram-sha-256
+host    salesdb    app_user    192.168.1.20/32    scram-sha-256
 
-host all all 0.0.0.0/0 reject
+host    all    all    0.0.0.0/0    reject
+```
+
+Decision Flow:
+
+```text
+Connection Request
+        ↓
+Read pg_hba.conf from top to bottom
+        ↓
+First Matching Rule
+        ↓
+Authentication Method Applied
+        ↓
+Allow or Reject Connection
 ```
 
 ---
 
-# 8. Security Best Practices
+# 8. Validate Configuration
 
-Recommended:
+Check authentication rules:
 
-* Use `scram-sha-256`
-* Avoid `trust` authentication
-* Limit IP ranges
-* Do not allow unnecessary remote access
-* Separate application users from administrators
-* Review authentication logs
+```sql
+SELECT * FROM pg_hba_file_rules;
+```
+
+This helps identify configuration errors before applying changes.
 
 ---
 
-# 9. Check Active Connections
+# 9. Security Best Practices
+
+Recommended:
+
+- Use `scram-sha-256`
+- Avoid `trust` authentication
+- Limit IP ranges
+- Do not allow unnecessary remote access
+- Separate application users from administrators
+- Review authentication logs
+- Document all authentication rules
+
+---
+
+# 10. Check Active Connections
 
 View connected users:
 
@@ -266,24 +300,22 @@ View connected users:
 SELECT
     usename,
     client_addr,
-    database
+    datname
 FROM pg_stat_activity;
 ```
 
 ---
 
-# 10. Troubleshooting
+# 11. Troubleshooting
 
 ## Authentication Failed
 
 Check:
 
-```text
-Username
-Password
-pg_hba.conf rules
-Authentication method
-```
+- Username
+- Password
+- pg_hba.conf rules
+- Authentication method
 
 ---
 
@@ -297,22 +329,21 @@ ss -lntp | grep 5432
 
 Verify:
 
-```conf
-listen_addresses
-port
-```
+- listen_addresses
+- port
+- Firewall rules
 
 ---
 
 # Security Checklist
 
-| Item           | Recommendation          |
-| -------------- | ----------------------- |
-| Authentication | scram-sha-256           |
-| Remote Access  | Limited IPs only        |
-| Admin Access   | Restricted users        |
-| Passwords      | Strong passwords        |
-| Rules          | Documented and reviewed |
+| Item | Recommendation |
+|---|---|
+| Authentication | scram-sha-256 |
+| Remote Access | Limited IPs only |
+| Admin Access | Restricted users |
+| Passwords | Strong passwords |
+| Rules | Documented and reviewed |
 
 ---
 
@@ -320,8 +351,7 @@ port
 
 Continue with:
 
-* Connection Management
-* Memory Configuration
-* WAL Configuration
-* Logging Configuration
-
+- Connection Management
+- Memory Configuration
+- WAL Configuration
+- Logging Configuration
