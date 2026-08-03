@@ -1,4 +1,4 @@
-# PostgreSQL Configuration - postgresql.conf
+# PostgreSQL Configuration: postgresql.conf
 
 ## Overview
 
@@ -58,22 +58,7 @@ C:\Program Files\PostgreSQL\<version>\data\postgresql.conf
 The main sections:
 
 ```text
-Connection Settings
-        |
-        v
-Memory Settings
-        |
-        v
-WAL Configuration
-        |
-        v
-Logging
-        |
-        v
-Query Planner
-        |
-        v
-Autovacuum
+Connection Settings → Memory Settings → WAL Configuration → Logging → Query Planner → Autovacuum
 ```
 
 ---
@@ -141,6 +126,8 @@ Increasing connections requires more memory.
 ## shared_buffers
 
 Main memory area used by PostgreSQL.
+`shared_buffers` is not the first parameter a DBA should increase. 
+Memory tuning must be based on workload analysis and performance measurements.
 
 Example:
 
@@ -331,6 +318,7 @@ SHOW shared_buffers;
 
 # 10. Best Practices
 
+* Never change configuration parameters without measuring the impact.
 * Backup configuration before changes.
 * Change one parameter at a time.
 * Document every modification.
@@ -359,7 +347,7 @@ SHOW shared_buffers;
 Continue with:
 
 * pg_hba.conf Security Configuration
-* Connection Management
-* Memory Tuning
+* Connection Configuration
+* Memory Configuration
 * WAL Configuration
 
